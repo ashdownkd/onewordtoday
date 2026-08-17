@@ -1,0 +1,129 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: #080B10;
+  font-family: "Space Grotesk", sans-serif;
+  overflow: hidden;
+}
+
+.canvas {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  background: #080B10;
+}
+
+.canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+header.owt-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 26px 40px;
+  z-index: 20;
+}
+
+.logo { font-family: "Fraunces", serif; font-weight: 300; font-size: 19px; color: #C9C4B8; }
+.logo em { font-style: italic; font-weight: 500; color: #E8DCC8; }
+
+.prompt-tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #5C6577; }
+
+.count-badge {
+  position: absolute; top: 28px; right: 40px;
+  font-size: 12px; color: #5C6577; text-align: right; line-height: 1.6; z-index: 20;
+}
+.count-badge b { color: #E8DCC8; font-family: "Fraunces", serif; font-size: 15px; }
+
+.map-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+svg#map { width: 100%; height: 100%; }
+
+.land { fill: #131926; stroke: #232B3B; stroke-width: 0.5; }
+.graticule { stroke: #161C28; stroke-width: 0.4; fill: none; }
+
+.point-core { animation: owt-blink 2.6s ease-in-out infinite; }
+.point-ring { fill: none; animation: owt-ripple 2.6s ease-out infinite; transform-origin: center; }
+
+@keyframes owt-blink {
+  0%, 100% { opacity: 0.35; r: 2.2; }
+  50% { opacity: 1; r: 3.4; }
+}
+@keyframes owt-ripple {
+  0% { r: 3; opacity: 0.55; stroke-width: 1.2; }
+  100% { r: 15; opacity: 0; stroke-width: 0.2; }
+}
+
+.word-label {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 8px;
+  fill: #E8DCC8;
+  opacity: 0;
+  animation: owt-label-fade 2.6s ease-in-out infinite;
+}
+@keyframes owt-label-fade {
+  0%, 20% { opacity: 0; }
+  45%, 75% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+.input-dock {
+  position: absolute; bottom: 44px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; z-index: 20;
+}
+
+.pill {
+  width: 300px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(232,220,200,0.16);
+  backdrop-filter: blur(12px);
+  border-radius: 999px;
+  padding: 13px 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+
+.pill input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: #E8DCC8; font-family: "Fraunces", serif; font-size: 15px; font-style: italic;
+}
+.pill input::placeholder { color: #5C6577; font-style: italic; }
+.pill input:focus-visible { outline: 2px solid #E8DCC8; outline-offset: 3px; border-radius: 999px; }
+
+.send-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: #E8DCC8; color: #0B0E14; border: none;
+  font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.send-btn:disabled { opacity: 0.4; cursor: default; }
+.send-btn:focus-visible { outline: 2px solid #E8DCC8; outline-offset: 3px; }
+
+.caption {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  font-size: 10.5px; letter-spacing: 0.08em; color: #3E4553; z-index: 20;
+}
+
+.legend {
+  position: absolute; bottom: 110px; left: 40px;
+  font-size: 10px; color: #5C6577; z-index: 20;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+.toast {
+  position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: #E8877C; z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .point-core, .point-ring, .word-label { animation: none; opacity: 0.85; }
+}
