@@ -7,7 +7,7 @@ blinking point near your location, alongside everyone else's.
 - **Next.js 14** (App Router) — free, deploys natively on Vercel
 - **d3-geo + topojson-client** — real world map geometry (Natural Earth data via `world-atlas`, loaded from a free public CDN)
 - **d3-zoom + d3-selection** — scroll/pinch to zoom, drag to pan
-- **@vercel/kv** — free Redis database for storing submissions (persists across all visitors)
+- **@upstash/redis** — free serverless Redis, connected via the Vercel Marketplace, for storing submissions (persists across all visitors)
 - **ip-api.com** — free IP → lat/lng geolocation, no key needed, called server-side
 
 ## What's new in this pass
@@ -27,6 +27,9 @@ blinking point near your location, alongside everyone else's.
   only, so stray characters can't break the layout
 - Added a favicon, Open Graph tags for link previews, a `robots.txt`,
   and a loading state while the map geometry fetches
+- **Fixed storage:** Vercel KV (`@vercel/kv`) is fully discontinued —
+  switched to `@upstash/redis` via the Vercel Marketplace integration
+  (see step 2 below, this replaces the old "Storage → KV" instructions)
 
 Nothing here requires a paid plan. Vercel KV and Vercel hosting both have
 generous free tiers that easily cover a small/medium project.
@@ -48,10 +51,15 @@ done after deploying.
 **1. Push this project to a GitHub repo, then import it in Vercel**
 (vercel.com → Add New → Project → import your repo).
 
-**2. Add a free KV database**
-In your Vercel project → Storage tab → Create Database → KV (Upstash Redis,
-free tier). Vercel automatically adds the required environment variables
-(`KV_URL`, `KV_REST_API_URL`, etc.) to your project — no manual copying needed.
+**2. Add a free Redis database (via Vercel Marketplace)**
+Vercel KV was discontinued, so this now goes through the Marketplace:
+in your Vercel project → **Storage** tab → **Browse Marketplace** (or
+**Create Database**) → search **"Upstash"** → install **Upstash for
+Redis** (the free tier needs no credit card) → connect it to this
+project. Vercel injects the required environment variables
+automatically — either `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`
+or `KV_REST_API_URL`/`KV_REST_API_TOKEN` depending on integration
+version; `lib/redis.js` reads either, so no manual copying needed.
 
 **3. Connect your domain**
 Vercel project → Settings → Domains → add `onewordtoday.live`. Vercel will
@@ -59,7 +67,7 @@ show you the DNS records (usually an A record + CNAME) to add at your
 domain registrar. Propagation is usually minutes to a few hours.
 
 **4. Redeploy**
-After adding the KV database, trigger a redeploy (Vercel does this
+After adding the Redis integration, trigger a redeploy (Vercel does this
 automatically on the next git push, or click Redeploy in the dashboard).
 
 That's it — `onewordtoday.live` will be live with real persistence.
@@ -70,7 +78,7 @@ That's it — `onewordtoday.live` will be live with real persistence.
 - Server reads their IP from request headers → looks up approximate
   lat/lng via ip-api.com → picks a color via a simple keyword mood
   lookup (`lib/mood.js`) → stores `{word, lat, lng, color, timestamp}`
-  in the KV list
+  in a Redis list via `lib/redis.js`
 - Frontend polls `/api/words` every 5 seconds, re-renders all points
   whose timestamp is within the last 24 hours (older ones are filtered
   out both server- and client-side)
@@ -92,6 +100,6 @@ for precise GPS location instead:
 ## Known limits (free tier)
 - `ip-api.com` free tier: 45 requests/minute — plenty for a small/medium
   site, would need a paid key only at high scale
-- Vercel KV free tier: 30MB storage / 3,000 commands per day on the
-  Hobby plan — fine for this use case since old words are trimmed
-  automatically
+- Upstash Redis free tier: 500K commands/month — fine for this use case
+  since old words are trimmed automatically and each submission is only
+  a few commands

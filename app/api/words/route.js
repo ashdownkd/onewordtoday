@@ -1,4 +1,4 @@
-import { kv } from "@vercel/kv";
+import { redis } from "@/lib/redis";
 import { ipToLocation } from "@/lib/geo";
 import { moodColor } from "@/lib/mood";
 import { allowSubmission } from "@/lib/rateLimit";
@@ -8,7 +8,7 @@ const MAX_STORED = 500;
 const WINDOW_MS = 24 * 60 * 60 * 1000; // words fade after 24h
 
 export async function GET() {
-  const raw = await kv.lrange(LIST_KEY, 0, MAX_STORED - 1);
+  const raw = await redis.lrange(LIST_KEY, 0, MAX_STORED - 1);
   const now = Date.now();
   const words = raw
     .map((entry) => (typeof entry === "string" ? JSON.parse(entry) : entry))
@@ -54,8 +54,8 @@ export async function POST(req) {
     ts: Date.now(),
   };
 
-  await kv.lpush(LIST_KEY, JSON.stringify(entry));
-  await kv.ltrim(LIST_KEY, 0, MAX_STORED - 1);
+  await redis.lpush(LIST_KEY, JSON.stringify(entry));
+  await redis.ltrim(LIST_KEY, 0, MAX_STORED - 1);
 
   return Response.json({ ok: true, entry });
 }
