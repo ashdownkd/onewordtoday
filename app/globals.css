@@ -20,34 +20,94 @@ html, body {
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
   pointer-events: none;
+  z-index: 5;
 }
 
+/* ---------- Header ---------- */
 header.owt-header {
   position: absolute;
   top: 0; left: 0; right: 0;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 26px 40px;
+  align-items: flex-start;
+  padding: 28px 40px;
   z-index: 20;
 }
 
-.logo { font-family: "Fraunces", serif; font-weight: 300; font-size: 19px; color: #C9C4B8; }
-.logo em { font-style: italic; font-weight: 500; color: #E8DCC8; }
+.logo {
+  font-family: "Fraunces", serif;
+  font-weight: 300;
+  font-size: 22px;
+  letter-spacing: 0.03em;
+  color: #C9C4B8;
+  text-shadow: 0 0 24px rgba(232, 220, 200, 0.12);
+}
+.logo em {
+  font-style: italic;
+  font-weight: 500;
+  color: #E8DCC8;
+  margin-left: 2px;
+}
 
-.prompt-tag { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #5C6577; }
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  text-align: right;
+}
+
+.prompt-tag {
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #5C6577;
+  max-width: 260px;
+}
 
 .count-badge {
-  position: absolute; top: 28px; right: 40px;
-  font-size: 12px; color: #5C6577; text-align: right; line-height: 1.6; z-index: 20;
+  font-size: 12px;
+  color: #5C6577;
 }
 .count-badge b { color: #E8DCC8; font-family: "Fraunces", serif; font-size: 15px; }
 
-.map-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-svg#map { width: 100%; height: 100%; }
+/* ---------- Map ---------- */
+.map-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; }
+svg#map { width: 100%; height: 100%; cursor: grab; touch-action: none; }
+svg#map:active { cursor: grabbing; }
 
-.land { fill: #131926; stroke: #232B3B; stroke-width: 0.5; }
+.map-loading {
+  position: absolute;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: #5C6577;
+  animation: owt-pulse 2s ease-in-out infinite;
+  z-index: 15;
+}
+
+.land { transition: filter 0.2s ease; }
+.land:hover { filter: brightness(1.15); }
 .graticule { stroke: #161C28; stroke-width: 0.4; fill: none; }
+
+.sea-label {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+  fill: rgba(120, 160, 190, 0.4);
+  pointer-events: none;
+  user-select: none;
+}
+
+.continent-label {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 500;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  fill: rgba(232, 220, 200, 0.25);
+  pointer-events: none;
+  user-select: none;
+}
 
 .point-core { animation: owt-blink 2.6s ease-in-out infinite; }
 .point-ring { fill: none; animation: owt-ripple 2.6s ease-out infinite; transform-origin: center; }
@@ -68,6 +128,7 @@ svg#map { width: 100%; height: 100%; }
   fill: #E8DCC8;
   opacity: 0;
   animation: owt-label-fade 2.6s ease-in-out infinite;
+  pointer-events: none;
 }
 @keyframes owt-label-fade {
   0%, 20% { opacity: 0; }
@@ -75,6 +136,7 @@ svg#map { width: 100%; height: 100%; }
   100% { opacity: 0; }
 }
 
+/* ---------- Input dock ---------- */
 .input-dock {
   position: absolute; bottom: 44px; left: 50%;
   transform: translateX(-50%);
@@ -124,6 +186,61 @@ svg#map { width: 100%; height: 100%; }
   font-size: 11px; color: #E8877C; z-index: 20;
 }
 
+/* ---------- Splash / intro gate ---------- */
+.splash {
+  position: fixed; inset: 0; z-index: 100;
+  background: #080B10;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.65s ease, filter 0.65s ease;
+}
+.splash-leaving { opacity: 0; filter: blur(6px); pointer-events: none; }
+
+.splash-inner { text-align: center; animation: owt-splash-in 1.1s ease both; }
+
+.splash-title {
+  font-family: "Fraunces", serif;
+  font-weight: 300;
+  font-size: clamp(38px, 7vw, 68px);
+  color: #E8DCC8;
+  letter-spacing: 0.01em;
+}
+.splash-title em { font-style: italic; font-weight: 500; margin-left: 16px; }
+
+.splash-subtitle {
+  margin-top: 18px;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 17px;
+  color: #9CA3AF;
+}
+
+.splash-hint {
+  margin-top: 42px;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #4A5261;
+  animation: owt-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes owt-splash-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes owt-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .point-core, .point-ring, .word-label { animation: none; opacity: 0.85; }
+  .point-core, .point-ring, .word-label, .splash-hint { animation: none; opacity: 0.85; }
+}
+
+@media (max-width: 640px) {
+  header.owt-header { padding: 20px 20px; }
+  .prompt-tag { max-width: 140px; }
+  .legend { left: 20px; bottom: 100px; }
+  .input-dock { bottom: 30px; }
+  .pill { width: 240px; }
 }

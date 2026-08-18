@@ -6,8 +6,27 @@ blinking point near your location, alongside everyone else's.
 ## Stack
 - **Next.js 14** (App Router) — free, deploys natively on Vercel
 - **d3-geo + topojson-client** — real world map geometry (Natural Earth data via `world-atlas`, loaded from a free public CDN)
+- **d3-zoom + d3-selection** — scroll/pinch to zoom, drag to pan
 - **@vercel/kv** — free Redis database for storing submissions (persists across all visitors)
 - **ip-api.com** — free IP → lat/lng geolocation, no key needed, called server-side
+
+## What's new in this pass
+- Map is now zoomable/pannable (scroll wheel, pinch, drag)
+- Each landmass is colored by continent via a radial gradient
+  (`lib/continents.js` for the palette, `lib/countryData.js` for the
+  ISO code → continent lookup) instead of a flat fill
+- Ocean, sea, and continent name labels (`lib/labels.js`)
+- Hovering a country shows its name (native SVG `<title>` tooltip)
+- Fixed a layout bug where the tagline and word count overlapped in
+  the top right on smaller screens
+- Added an intro gate screen (`app/components/Splash.js`) — title,
+  the day's question, "press enter to continue" — before the map loads
+- Added per-IP rate limiting (one submission per 20s, `lib/rateLimit.js`)
+  so the public site can't be spammed
+- Input is sanitized server-side to letters/numbers/apostrophes/hyphens
+  only, so stray characters can't break the layout
+- Added a favicon, Open Graph tags for link previews, a `robots.txt`,
+  and a loading state while the map geometry fetches
 
 Nothing here requires a paid plan. Vercel KV and Vercel hosting both have
 generous free tiers that easily cover a small/medium project.

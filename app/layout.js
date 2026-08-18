@@ -1,8 +1,20 @@
 import "./globals.css";
 
 export const metadata = {
+  metadataBase: new URL("https://onewordtoday.live"),
   title: "One Word Today",
-  description: "How was your day, in one word? A live map of the world, one word at a time.",
+  description:
+    "How was your day, in one word? A live, glowing map of the world — one word, one point, one moment at a time.",
+  openGraph: {
+    title: "One Word Today",
+    description: "How was your day, in one word?",
+    type: "website",
+    url: "https://onewordtoday.live",
+  },
+};
+
+export const viewport = {
+  themeColor: "#080B10",
 };
 
 export default function RootLayout({ children }) {

@@ -1,6 +1,7 @@
 import { kv } from "@vercel/kv";
 import { ipToLocation } from "@/lib/geo";
 import { moodColor } from "@/lib/mood";
+import { allowSubmission } from "@/lib/rateLimit";
 
 const LIST_KEY = "owt:words";
 const MAX_STORED = 500;
@@ -17,8 +18,12 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const body = await req.json();
-  const word = (body.word || "").trim().split(/\s+/)[0]; // enforce one word
+  const body = await req.json().catch(() => ({}));
+  const raw = (body.word || "").trim().split(/\s+/)[0] || "";
+
+  // Keep letters (any language), numbers, apostrophes, hyphens only —
+  // strips anything that could break layout or isn't really "a word".
+  const word = raw.normalize("NFC").replace(/[^\p{L}\p{N}'-]/gu, "");
 
   if (!word || word.length > 24) {
     return Response.json({ error: "Send a single word, 24 characters or less." }, { status: 400 });
@@ -28,6 +33,14 @@ export async function POST(req) {
     req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
     req.headers.get("x-real-ip") ||
     "";
+
+  const allowed = await allowSubmission(ip);
+  if (!allowed) {
+    return Response.json(
+      { error: "One word at a time — try again in a few seconds." },
+      { status: 429 }
+    );
+  }
 
   const loc = await ipToLocation(ip);
 
