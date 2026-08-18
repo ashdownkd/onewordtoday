@@ -52,6 +52,31 @@ blinking point near your location, alongside everyone else's.
 - Deepened the zoom range (1x–24x) so there's room to actually explore
   down to country level
 
+## Redesign pass (monochrome, matching the reference look)
+- Replaced the rainbow per-continent gradients with a **restrained
+  monochrome steel-blue palette** (`lib/continents.js`) — a few subtle
+  variants for texture, not a different color per continent. Color is
+  reserved for the word points, not the base terrain.
+- **Removed the big "AFRICA" / "EUROPE" continent labels** — they were
+  colliding with country names at the default zoom level (the
+  "EUROPE"/country-name overlap bug). Country names alone read much
+  cleaner and match the reference image.
+- Labels switched from bold italic serif to **thin, small, uppercase
+  sans-serif** (`Space Grotesk`) — quieter and more map-like.
+- Softened the graticule grid and land drop-shadow so the base map
+  recedes and the glowing word points are what draws the eye.
+
+## Fixing "Couldn't send" after connecting the database
+Connecting a database in Vercel's Storage tab does **not** retroactively
+inject env vars into a deployment that's already running — only new
+deployments pick them up. If you see "Couldn't send" right after
+connecting Upstash: go to **Deployments** → latest deployment → **⋯** →
+**Redeploy**. If it still fails after that, open that deployment's
+**Runtime Logs**, find the failed `/api/words` request, and check the
+actual server error there — `lib/redis.js` already matches Upstash's
+official `Redis.fromEnv()` example for this integration, so a fresh
+redeploy resolves it in the vast majority of cases.
+
 Nothing here requires a paid plan. Vercel KV and Vercel hosting both have
 generous free tiers that easily cover a small/medium project.
 

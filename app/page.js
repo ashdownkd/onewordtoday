@@ -7,8 +7,8 @@ import { select } from "d3-selection";
 import { feature } from "topojson-client";
 import Splash from "./components/Splash";
 import { COUNTRY_INFO } from "@/lib/countryData";
-import { CONTINENT_COLORS, slugify } from "@/lib/continents";
-import { OCEAN_LABELS, CONTINENT_LABELS } from "@/lib/labels";
+import { LAND_GRADIENTS, LAND_STROKE } from "@/lib/continents";
+import { OCEAN_LABELS } from "@/lib/labels";
 
 // 50m resolution: real coastline and border detail, not a simplified
 // silhouette. Bigger download than the 110m set but still free/CDN'd.
@@ -50,18 +50,17 @@ export default function Page() {
       .catch(() => setError("Couldn't load map data — check your connection."));
   }, []);
 
-  // Precompute per-country continent/name/area/centroid once when the
-  // map loads — this is what drives coloring and label prioritization,
-  // and it shouldn't be recalculated on every poll/zoom tick.
+  // Precompute per-country name/area/centroid once when the map loads —
+  // this drives label prioritization and shouldn't recalc on every
+  // poll/zoom tick.
   const countryFeatures = useMemo(() => {
     if (!land || !pathRef.current) return [];
     return land.features.map((f) => {
       const info = COUNTRY_INFO[Number(f.id)];
-      const continent = info ? info[1] : "Unknown";
       const name = info ? info[0] : null;
       const area = pathRef.current.area(f);
       const centroid = pathRef.current.centroid(f);
-      return { f, continent, name, area, centroid };
+      return { f, name, area, centroid };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [land]);
@@ -160,10 +159,6 @@ export default function Page() {
     .sort((a, b) => b.area - a.area)
     .slice(0, MAX_COUNTRY_LABELS);
 
-  // Continent labels own the view when zoomed out, then hand off to
-  // country-level labels as you zoom past ~2x.
-  const continentOpacity = Math.max(0, Math.min(1, (2.2 - k) / 1.2));
-
   return (
     <div className="canvas">
       {!entered && <Splash onEnter={() => setEntered(true)} />}
@@ -209,14 +204,14 @@ export default function Page() {
           aria-label="World map with live word submissions"
         >
           <defs>
-            {Object.entries(CONTINENT_COLORS).map(([name, c]) => (
-              <radialGradient key={name} id={`grad-${slugify(name)}`} cx="30%" cy="25%" r="95%">
+            {LAND_GRADIENTS.map((c, i) => (
+              <radialGradient key={i} id={`grad-${i}`} cx="32%" cy="26%" r="90%">
                 <stop offset="0%" stopColor={c.light} stopOpacity="1" />
-                <stop offset="100%" stopColor={c.base} stopOpacity="0.96" />
+                <stop offset="100%" stopColor={c.base} stopOpacity="0.97" />
               </radialGradient>
             ))}
             <filter id="land-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#000000" floodOpacity="0.45" />
+              <feDropShadow dx="0" dy="0" stdDeviation="2.2" floodColor="#000000" floodOpacity="0.35" />
             </filter>
           </defs>
 
@@ -227,15 +222,15 @@ export default function Page() {
 
             <g filter="url(#land-shadow)">
               {pathRef.current &&
-                countryFeatures.map(({ f, continent, name }, i) => (
+                countryFeatures.map(({ f, name }, i) => (
                   <path
                     key={i}
                     className="land"
                     d={pathRef.current(f)}
                     style={{
-                      fill: `url(#grad-${slugify(continent)})`,
-                      stroke: (CONTINENT_COLORS[continent] || CONTINENT_COLORS.Unknown).stroke,
-                      strokeWidth: 0.6,
+                      fill: `url(#grad-${i % LAND_GRADIENTS.length})`,
+                      stroke: LAND_STROKE,
+                      strokeWidth: 0.5,
                     }}
                     vectorEffect="non-scaling-stroke"
                   >
@@ -251,23 +246,6 @@ export default function Page() {
                 return (
                   <g key={`sea-${i}`} transform={`translate(${p[0]},${p[1]}) scale(${inverseScale})`}>
                     <text className="sea-label" textAnchor="middle">{o.name}</text>
-                  </g>
-                );
-              })}
-
-            {projection &&
-              CONTINENT_LABELS.map((c, i) => {
-                const p = projection([c.lng, c.lat]);
-                if (!p) return null;
-                return (
-                  <g key={`cont-${i}`} transform={`translate(${p[0]},${p[1]}) scale(${inverseScale})`}>
-                    <text
-                      className="continent-label"
-                      textAnchor="middle"
-                      style={{ opacity: continentOpacity }}
-                    >
-                      {c.name}
-                    </text>
                   </g>
                 );
               })}
