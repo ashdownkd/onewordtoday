@@ -9,16 +9,23 @@ import Splash from "./components/Splash";
 import { COUNTRY_INFO } from "@/lib/countryData";
 import { LAND_GRADIENTS, LAND_STROKE } from "@/lib/continents";
 import { OCEAN_LABELS } from "@/lib/labels";
+import { STATE_INFO } from "@/lib/stateData";
 
 // 50m resolution: real coastline and border detail, not a simplified
 // silhouette. Bigger download than the 110m set but still free/CDN'd.
 const WORLD_TOPOJSON_URL = "https://unpkg.com/world-atlas@2/countries-50m.json";
-const WIDTH = 1000;
-const HEIGHT = 520;
+
+// Fallback box before the container has been measured — real sizing
+// takes over immediately via ResizeObserver below.
+const DEFAULT_WIDTH = 1000;
+const DEFAULT_HEIGHT = 520;
 
 // How many country labels can be on screen at once, max — keeps very
 // high zoom from turning into a wall of text.
 const MAX_COUNTRY_LABELS = 140;
+
+// Zoom level past which state/province name labels start appearing.
+const STATE_LABEL_MIN_ZOOM = 5;
 
 export default function Page() {
   const [entered, setEntered] = useState(false);
@@ -29,18 +36,22 @@ export default function Page() {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [transform, setTransform] = useState(zoomIdentity);
+  const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
 
+  const containerRef = useRef(null);
   const svgRef = useRef(null);
   const pathRef = useRef(null);
   const projectionRef = useRef(null);
   const zoomBehaviorRef = useRef(null);
 
-  // Load real world map geometry once
-  useEffect(() => {
-    const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], { type: "Sphere" });
+  function setupProjection(width, height) {
+    const projection = geoNaturalEarth1().fitSize([width, height], { type: "Sphere" });
     projectionRef.current = projection;
     pathRef.current = geoPath(projection);
+  }
 
+  // Fetch the world map geometry once.
+  useEffect(() => {
     fetch(WORLD_TOPOJSON_URL)
       .then((r) => r.json())
       .then((topo) => {
@@ -50,9 +61,38 @@ export default function Page() {
       .catch(() => setError("Couldn't load map data — check your connection."));
   }, []);
 
-  // Precompute per-country name/area/centroid once when the map loads —
-  // this drives label prioritization and shouldn't recalc on every
-  // poll/zoom tick.
+  // Fit the projection to the ACTUAL container size, and keep it fit
+  // as the viewport changes (rotate, resize, mobile browser chrome
+  // showing/hiding). This is what fixes the map being squashed into a
+  // tiny letterboxed strip on tall phone screens.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    let debounceId;
+
+    function measure() {
+      const rect = el.getBoundingClientRect();
+      const w = Math.max(200, Math.round(rect.width));
+      const h = Math.max(200, Math.round(rect.height));
+      setupProjection(w, h);
+      setSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
+    }
+
+    measure();
+    const ro = new ResizeObserver(() => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(measure, 150);
+    });
+    ro.observe(el);
+    return () => {
+      clearTimeout(debounceId);
+      ro.disconnect();
+    };
+  }, []);
+
+  // Precompute per-country name/area/centroid whenever the map data OR
+  // the projection size changes — must recompute on resize since area/
+  // centroid are derived from the current projection.
   const countryFeatures = useMemo(() => {
     if (!land || !pathRef.current) return [];
     return land.features.map((f) => {
@@ -63,26 +103,28 @@ export default function Page() {
       return { f, name, area, centroid };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [land]);
+  }, [land, size.width, size.height]);
 
-  // Zoom + pan: wheel to zoom, drag to pan, pinch on touch. Deeper
-  // zoom range than a typical map widget on purpose — this is meant
-  // to be explored down to country level.
+  // Zoom + pan: wheel to zoom, drag to pan, pinch on touch. Recreated
+  // whenever the container size changes, since translateExtent is
+  // sized to it — resets pan/zoom on resize so an old transform can't
+  // end up mismatched with a new coordinate space.
   useEffect(() => {
     if (!svgRef.current) return;
     const zoomBehavior = d3zoom()
       .scaleExtent([1, 24])
       .translateExtent([
-        [-WIDTH * 0.5, -HEIGHT * 0.5],
-        [WIDTH * 1.5, HEIGHT * 1.5],
+        [-size.width * 0.5, -size.height * 0.5],
+        [size.width * 1.5, size.height * 1.5],
       ])
       .on("zoom", (event) => setTransform(event.transform));
 
     zoomBehaviorRef.current = zoomBehavior;
     const sel = select(svgRef.current);
     sel.call(zoomBehavior);
+    sel.call(zoomBehavior.transform, zoomIdentity);
     return () => sel.on(".zoom", null);
-  }, []);
+  }, [size.width, size.height]);
 
   function zoomBy(factor) {
     if (!svgRef.current || !zoomBehaviorRef.current) return;
@@ -159,6 +201,8 @@ export default function Page() {
     .sort((a, b) => b.area - a.area)
     .slice(0, MAX_COUNTRY_LABELS);
 
+  const showStateLabels = k >= STATE_LABEL_MIN_ZOOM && projection;
+
   return (
     <div className="canvas">
       {!entered && <Splash onEnter={() => setEntered(true)} />}
@@ -193,12 +237,12 @@ export default function Page() {
         <button onClick={resetView} aria-label="Reset view" className="zoom-reset">⤾</button>
       </div>
 
-      <div className="map-wrap">
+      <div className="map-wrap" ref={containerRef}>
         {!land && <div className="map-loading">loading the world…</div>}
         <svg
           ref={svgRef}
           id="map"
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          viewBox={`0 0 ${size.width} ${size.height}`}
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label="World map with live word submissions"
@@ -258,6 +302,22 @@ export default function Page() {
                 <text className="country-label" textAnchor="middle">{name}</text>
               </g>
             ))}
+
+            {showStateLabels &&
+              Object.entries(STATE_INFO).flatMap(([countryName, states]) =>
+                states.map(([name, lat, lng], idx) => {
+                  const p = projection([lng, lat]);
+                  if (!p) return null;
+                  return (
+                    <g
+                      key={`state-${countryName}-${idx}`}
+                      transform={`translate(${p[0]},${p[1]}) scale(${inverseScale})`}
+                    >
+                      <text className="state-label" textAnchor="middle">{name}</text>
+                    </g>
+                  );
+                })
+              )}
 
             {projection &&
               words.map((w, i) => {

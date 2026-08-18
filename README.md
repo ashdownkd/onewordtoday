@@ -118,6 +118,42 @@ automatically on the next git push, or click Redeploy in the dashboard).
 
 That's it — `onewordtoday.live` will be live with real persistence.
 
+## Mobile/tablet fix
+The map previously used a fixed landscape-shaped coordinate box, which
+got letterboxed into a tiny centered strip on tall phone screens. The
+projection now measures its actual container via `ResizeObserver` and
+refits itself — full-bleed on any screen size/orientation, phone,
+tablet, or desktop. Also switched `100vh` to `100dvh` (with a `100vh`
+fallback) since mobile browsers include the address-bar area in `100vh`,
+which was clipping content at the bottom on some devices.
+
+## State/province labels
+Zoom in (or tap +) past a threshold and state/province names appear on
+top of the country layer, for a curated set of major countries covering
+every populated continent (`lib/stateData.js` — 374 entries across 17
+countries, hand-verified). This is **name labels only, not boundary
+outlines** — see below for why, and how to extend it.
+
+**Why not full state/district boundary polygons, or full global
+coverage:** the realistic public sources for this (geoBoundaries /
+Natural Earth admin-1 and admin-2 data) are either stored via Git LFS —
+which breaks silently when fetched through a CDN like jsdelivr, serving
+a tiny pointer file instead of the real shape — or sit behind a
+metadata API that rate-limited during testing. Shipping a data
+dependency I can't verify works is exactly what caused the earlier
+storage bug, so this was left out rather than risk repeating that.
+District/county-level data globally is also just very large (tens of
+thousands of polygons) — not a good fit for a decorative background map
+loaded client-side.
+
+**To extend country coverage:** add another entry to `STATE_INFO` in
+`lib/stateData.js`, same shape: `CountryName: [[name, lat, lng], ...]`.
+**To eventually add real boundary outlines:** the more robust path is a
+server-side proxy — a Next.js API route that fetches and caches
+geoBoundaries data on your own infrastructure (sidesteps both the LFS
+and rate-limit issues) — rather than the client fetching a third party
+directly. Happy to help build that out if/when you want to invest in it.
+
 ## How it works, short version
 
 - User types a word → POSTs to `/api/words`

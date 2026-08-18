@@ -1,16 +1,19 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   background: #080B10;
   font-family: "Space Grotesk", sans-serif;
   overflow: hidden;
+  width: 100%;
 }
 
 .canvas {
   position: relative;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   background:
     radial-gradient(circle at 50% 35%, rgba(90, 130, 160, 0.07), transparent 62%),
     #080B10;
@@ -123,6 +126,20 @@ svg#map:active { cursor: grabbing; }
   text-transform: uppercase;
   fill: rgba(232, 236, 240, 0.75);
   stroke-width: 2px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.state-label {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 400;
+  font-size: 6px;
+  letter-spacing: 0.06em;
+  fill: rgba(200, 210, 220, 0.55);
+  stroke: #080B10;
+  stroke-width: 1.5px;
+  paint-order: stroke fill;
+  stroke-linejoin: round;
   pointer-events: none;
   user-select: none;
 }
@@ -280,11 +297,23 @@ svg#map:active { cursor: grabbing; }
   .point-core, .point-ring, .word-label, .splash-hint { animation: none; opacity: 0.85; }
 }
 
+@media (min-width: 641px) and (max-width: 1024px) {
+  header.owt-header { padding: 24px 28px; }
+  .prompt-tag { max-width: 200px; }
+  .legend { left: 28px; bottom: 104px; }
+  .zoom-controls { right: 28px; bottom: 104px; }
+  .pill { width: 270px; }
+}
+
 @media (max-width: 640px) {
-  header.owt-header { padding: 20px 20px; }
-  .prompt-tag { max-width: 140px; }
-  .legend { left: 20px; bottom: 100px; }
-  .zoom-controls { right: 20px; bottom: 100px; }
-  .input-dock { bottom: 30px; }
-  .pill { width: 240px; }
+  header.owt-header { padding: 18px 18px; }
+  .logo { font-size: 18px; }
+  .prompt-tag { max-width: 160px; font-size: 9.5px; line-height: 1.4; }
+  .count-badge { font-size: 11px; }
+  .legend { left: 16px; bottom: 96px; font-size: 9px; }
+  .zoom-controls { right: 16px; bottom: 96px; }
+  .zoom-controls button { width: 30px; height: 30px; font-size: 14px; }
+  .input-dock { bottom: 22px; }
+  .pill { width: min(80vw, 260px); padding: 11px 16px; }
+  .caption { font-size: 9px; bottom: 6px; padding: 0 12px; text-align: center; }
 }
