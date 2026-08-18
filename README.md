@@ -31,6 +31,27 @@ blinking point near your location, alongside everyone else's.
   switched to `@upstash/redis` via the Vercel Marketplace integration
   (see step 2 below, this replaces the old "Storage → KV" instructions)
 
+## Map quality pass
+- Switched from 110m to **50m resolution** map data — real coastline
+  and border detail instead of a simplified silhouette
+- **Country name labels**, not just continents — the ~15 largest
+  nations show even fully zoomed out; more reveal themselves as you
+  zoom in (tune the constants in `page.js`'s `labelThreshold` line
+  if you want labels to appear sooner/later)
+- Labels and point markers now stay a **constant screen size** at any
+  zoom level (each is wrapped in a `scale(1/k)` counter-transform) —
+  before this they'd balloon to unreadable sizes when zoomed in
+- All labels have a dark halo (`paint-order: stroke fill`) so they
+  stay legible over any color of land or sea
+- Continent labels fade out smoothly as you zoom past ~2x, handing
+  off to country labels — same handoff you'd see in a real map app
+- Richer, more saturated continent gradients + a subtle drop-shadow
+  filter on the landmasses for a "lifted off the ocean" depth effect
+- On-screen **zoom controls** (+/−/reset) bottom-right, in addition to
+  scroll/pinch/drag
+- Deepened the zoom range (1x–24x) so there's room to actually explore
+  down to country level
+
 Nothing here requires a paid plan. Vercel KV and Vercel hosting both have
 generous free tiers that easily cover a small/medium project.
 

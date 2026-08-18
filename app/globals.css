@@ -11,7 +11,9 @@ html, body {
   position: relative;
   width: 100%;
   height: 100vh;
-  background: #080B10;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(90, 130, 160, 0.07), transparent 62%),
+    #080B10;
 }
 
 .canvas::after {
@@ -87,14 +89,27 @@ svg#map:active { cursor: grabbing; }
 }
 
 .land { transition: filter 0.2s ease; }
-.land:hover { filter: brightness(1.15); }
-.graticule { stroke: #161C28; stroke-width: 0.4; fill: none; }
+.land:hover { filter: brightness(1.18); }
+.graticule { stroke: rgba(120, 150, 180, 0.1); stroke-width: 0.4; fill: none; }
+
+/* Halo technique: a dark stroke behind the fill makes every label
+   legible regardless of what color of land or sea sits behind it,
+   without needing per-label background boxes. */
+.sea-label,
+.continent-label,
+.country-label,
+.word-label {
+  paint-order: stroke fill;
+  stroke: #080B10;
+  stroke-linejoin: round;
+}
 
 .sea-label {
   font-family: "Space Grotesk", sans-serif;
-  font-size: 7px;
+  font-size: 8px;
   letter-spacing: 0.12em;
-  fill: rgba(120, 160, 190, 0.4);
+  fill: rgba(150, 185, 210, 0.55);
+  stroke-width: 3px;
   pointer-events: none;
   user-select: none;
 }
@@ -102,9 +117,22 @@ svg#map:active { cursor: grabbing; }
 .continent-label {
   font-family: "Space Grotesk", sans-serif;
   font-weight: 500;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  fill: rgba(232, 220, 200, 0.25);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  fill: rgba(232, 220, 200, 0.4);
+  stroke-width: 4px;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.25s ease;
+}
+
+.country-label {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 10px;
+  fill: rgba(232, 220, 200, 0.7);
+  stroke-width: 3px;
   pointer-events: none;
   user-select: none;
 }
@@ -124,8 +152,9 @@ svg#map:active { cursor: grabbing; }
 .word-label {
   font-family: "Fraunces", serif;
   font-style: italic;
-  font-size: 8px;
+  font-size: 9px;
   fill: #E8DCC8;
+  stroke-width: 3px;
   opacity: 0;
   animation: owt-label-fade 2.6s ease-in-out infinite;
   pointer-events: none;
@@ -180,6 +209,30 @@ svg#map:active { cursor: grabbing; }
 }
 .legend-item { display: flex; align-items: center; gap: 8px; }
 .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+.zoom-controls {
+  position: absolute;
+  bottom: 110px; right: 40px;
+  z-index: 20;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.zoom-controls button {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(232, 220, 200, 0.16);
+  backdrop-filter: blur(10px);
+  color: #E8DCC8;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.zoom-controls button:hover { background: rgba(255, 255, 255, 0.1); transform: scale(1.06); }
+.zoom-controls button:active { transform: scale(0.94); }
+.zoom-controls .zoom-reset { font-size: 13px; color: #9CA6B4; margin-top: 4px; }
 
 .toast {
   position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
@@ -241,6 +294,7 @@ svg#map:active { cursor: grabbing; }
   header.owt-header { padding: 20px 20px; }
   .prompt-tag { max-width: 140px; }
   .legend { left: 20px; bottom: 100px; }
+  .zoom-controls { right: 20px; bottom: 100px; }
   .input-dock { bottom: 30px; }
   .pill { width: 240px; }
 }
