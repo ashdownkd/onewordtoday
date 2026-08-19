@@ -49,7 +49,10 @@ export async function POST(req) {
     lat: loc.lat,
     lng: loc.lng,
     city: loc.city,
+    region: loc.region,
     country: loc.country,
+    countryCode: loc.countryCode,
+    district: loc.district,
     color: moodColor(word),
     ts: Date.now(),
   };

@@ -154,6 +154,28 @@ geoBoundaries data on your own infrastructure (sidesteps both the LFS
 and rate-limit issues) — rather than the client fetching a third party
 directly. Happy to help build that out if/when you want to invest in it.
 
+## Label readability + zoom smoothness
+- Country/state/sea labels were rendering too small to read — bumped
+  font sizes up meaningfully and strengthened the dark halo behind
+  each one (`app/globals.css`).
+- Found the actual cause of choppy zoom: every zoom/pan frame was
+  re-running the full map projection for all ~250 country shapes and
+  every label, because that work was happening inline during render.
+  All of it is now precomputed in `useMemo` blocks tied to the map
+  data and container size — a zoom/pan gesture now only updates one
+  CSS transform, which is what the browser is actually fast at.
+  Added `will-change: transform` on that layer too.
+
+## Click a word for details
+Every point on the map is now clickable (bigger invisible hit-area
+than the visible dot, so it's easy to tap on mobile). It opens a card
+showing the word, and whatever location detail is actually available
+for that submission: city, state (now pulled from the same IP lookup
+via ip-api's `regionName` field), country with its flag, and district
+**when ip-api's `district` field happens to be populated** — most IPs
+worldwide only resolve to city-level, so this will often be blank, and
+the card simply omits that row rather than showing something fake.
+
 ## How it works, short version
 
 - User types a word → POSTs to `/api/words`

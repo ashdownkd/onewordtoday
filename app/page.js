@@ -10,6 +10,7 @@ import { COUNTRY_INFO } from "@/lib/countryData";
 import { LAND_GRADIENTS, LAND_STROKE } from "@/lib/continents";
 import { OCEAN_LABELS } from "@/lib/labels";
 import { STATE_INFO } from "@/lib/stateData";
+import { flagEmoji } from "@/lib/flag";
 
 // 50m resolution: real coastline and border detail, not a simplified
 // silhouette. Bigger download than the 110m set but still free/CDN'd.
@@ -27,6 +28,15 @@ const MAX_COUNTRY_LABELS = 140;
 // Zoom level past which state/province name labels start appearing.
 const STATE_LABEL_MIN_ZOOM = 5;
 
+function timeAgo(ts) {
+  const diffMin = Math.floor((Date.now() - ts) / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
+
 export default function Page() {
   const [entered, setEntered] = useState(false);
   const [land, setLand] = useState(null);
@@ -37,6 +47,7 @@ export default function Page() {
   const [sending, setSending] = useState(false);
   const [transform, setTransform] = useState(zoomIdentity);
   const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
+  const [selectedWord, setSelectedWord] = useState(null);
 
   const containerRef = useRef(null);
   const svgRef = useRef(null);
@@ -63,8 +74,7 @@ export default function Page() {
 
   // Fit the projection to the ACTUAL container size, and keep it fit
   // as the viewport changes (rotate, resize, mobile browser chrome
-  // showing/hiding). This is what fixes the map being squashed into a
-  // tiny letterboxed strip on tall phone screens.
+  // showing/hiding).
   useEffect(() => {
     if (!containerRef.current) return;
     const el = containerRef.current;
@@ -90,9 +100,12 @@ export default function Page() {
     };
   }, []);
 
-  // Precompute per-country name/area/centroid whenever the map data OR
-  // the projection size changes — must recompute on resize since area/
-  // centroid are derived from the current projection.
+  // --- Everything below is geometry that does NOT depend on the zoom
+  // transform, only on the map data + container size. Precomputing it
+  // here means a zoom/pan gesture only ever updates one CSS transform
+  // on a parent <g> — nothing re-projects or re-draws per frame. This
+  // is what makes zoom/pan feel smooth instead of janky.
+
   const countryFeatures = useMemo(() => {
     if (!land || !pathRef.current) return [];
     return land.features.map((f) => {
@@ -100,10 +113,51 @@ export default function Page() {
       const name = info ? info[0] : null;
       const area = pathRef.current.area(f);
       const centroid = pathRef.current.centroid(f);
-      return { f, name, area, centroid };
+      const d = pathRef.current(f);
+      return { f, name, area, centroid, d };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [land, size.width, size.height]);
+
+  const graticuleD = useMemo(() => {
+    if (!pathRef.current) return null;
+    return pathRef.current(geoGraticule10());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.width, size.height, land]);
+
+  const projectedOceanLabels = useMemo(() => {
+    if (!projectionRef.current) return [];
+    return OCEAN_LABELS.map((o) => {
+      const p = projectionRef.current([o.lng, o.lat]);
+      return p ? { name: o.name, x: p[0], y: p[1] } : null;
+    }).filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.width, size.height]);
+
+  const projectedStateLabels = useMemo(() => {
+    if (!projectionRef.current) return [];
+    const out = [];
+    for (const [countryName, states] of Object.entries(STATE_INFO)) {
+      for (const [name, lat, lng] of states) {
+        const p = projectionRef.current([lng, lat]);
+        if (p) out.push({ key: `${countryName}-${name}`, name, x: p[0], y: p[1] });
+      }
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.width, size.height]);
+
+  const projectedWords = useMemo(() => {
+    if (!projectionRef.current) return [];
+    return words
+      .map((w, i) => {
+        const p = projectionRef.current([w.lng, w.lat]);
+        if (!p) return null;
+        return { ...w, x: p[0], y: p[1], delay: `${(i % 12) * 0.2}s`, _key: `${w.ts}-${i}` };
+      })
+      .filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [words, size.width, size.height]);
 
   // Zoom + pan: wheel to zoom, drag to pan, pinch on touch. Recreated
   // whenever the container size changes, since translateExtent is
@@ -138,6 +192,15 @@ export default function Page() {
       .duration(400)
       .call(zoomBehaviorRef.current.transform, zoomIdentity);
   }
+
+  // Escape closes the detail card.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") setSelectedWord(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const fetchWords = useCallback(async () => {
     try {
@@ -186,8 +249,6 @@ export default function Page() {
     }
   }
 
-  const graticule = geoGraticule10();
-  const projection = projectionRef.current;
   const k = transform.k;
   const inverseScale = 1 / k;
 
@@ -201,7 +262,7 @@ export default function Page() {
     .sort((a, b) => b.area - a.area)
     .slice(0, MAX_COUNTRY_LABELS);
 
-  const showStateLabels = k >= STATE_LABEL_MIN_ZOOM && projection;
+  const showStateLabels = k >= STATE_LABEL_MIN_ZOOM;
 
   return (
     <div className="canvas">
@@ -218,6 +279,46 @@ export default function Page() {
           </div>
         </div>
       </header>
+
+      {selectedWord && (
+        <div className="info-card" role="dialog" aria-label="Word details">
+          <button className="info-card-close" onClick={() => setSelectedWord(null)} aria-label="Close">
+            ×
+          </button>
+          <div className="info-card-word" style={{ color: selectedWord.color }}>
+            {selectedWord.word}
+          </div>
+          <div className="info-card-rows">
+            {selectedWord.district && (
+              <div>
+                <span>District</span>
+                <span>{selectedWord.district}</span>
+              </div>
+            )}
+            {selectedWord.city && (
+              <div>
+                <span>City</span>
+                <span>{selectedWord.city}</span>
+              </div>
+            )}
+            {selectedWord.region && (
+              <div>
+                <span>State</span>
+                <span>{selectedWord.region}</span>
+              </div>
+            )}
+            {selectedWord.country && (
+              <div>
+                <span>Country</span>
+                <span>
+                  {flagEmoji(selectedWord.countryCode)} {selectedWord.country}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="info-card-time">{timeAgo(selectedWord.ts)}</div>
+        </div>
+      )}
 
       <div className="legend">
         <div className="legend-item">
@@ -246,6 +347,7 @@ export default function Page() {
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label="World map with live word submissions"
+          onClick={() => setSelectedWord(null)}
         >
           <defs>
             {LAND_GRADIENTS.map((c, i) => (
@@ -259,40 +361,32 @@ export default function Page() {
             </filter>
           </defs>
 
-          <g transform={transform.toString()}>
-            {pathRef.current && (
-              <path className="graticule" d={pathRef.current(graticule)} vectorEffect="non-scaling-stroke" />
-            )}
+          <g className="map-layer" transform={transform.toString()}>
+            {graticuleD && <path className="graticule" d={graticuleD} vectorEffect="non-scaling-stroke" />}
 
             <g filter="url(#land-shadow)">
-              {pathRef.current &&
-                countryFeatures.map(({ f, name }, i) => (
-                  <path
-                    key={i}
-                    className="land"
-                    d={pathRef.current(f)}
-                    style={{
-                      fill: `url(#grad-${i % LAND_GRADIENTS.length})`,
-                      stroke: LAND_STROKE,
-                      strokeWidth: 0.5,
-                    }}
-                    vectorEffect="non-scaling-stroke"
-                  >
-                    <title>{name || "Unknown territory"}</title>
-                  </path>
-                ))}
+              {countryFeatures.map(({ d, name }, i) => (
+                <path
+                  key={i}
+                  className="land"
+                  d={d}
+                  style={{
+                    fill: `url(#grad-${i % LAND_GRADIENTS.length})`,
+                    stroke: LAND_STROKE,
+                    strokeWidth: 0.5,
+                  }}
+                  vectorEffect="non-scaling-stroke"
+                >
+                  <title>{name || "Unknown territory"}</title>
+                </path>
+              ))}
             </g>
 
-            {projection &&
-              OCEAN_LABELS.map((o, i) => {
-                const p = projection([o.lng, o.lat]);
-                if (!p) return null;
-                return (
-                  <g key={`sea-${i}`} transform={`translate(${p[0]},${p[1]}) scale(${inverseScale})`}>
-                    <text className="sea-label" textAnchor="middle">{o.name}</text>
-                  </g>
-                );
-              })}
+            {projectedOceanLabels.map((o, i) => (
+              <g key={`sea-${i}`} transform={`translate(${o.x},${o.y}) scale(${inverseScale})`}>
+                <text className="sea-label" textAnchor="middle">{o.name}</text>
+              </g>
+            ))}
 
             {visibleCountryLabels.map(({ f, name, centroid }) => (
               <g
@@ -304,47 +398,41 @@ export default function Page() {
             ))}
 
             {showStateLabels &&
-              Object.entries(STATE_INFO).flatMap(([countryName, states]) =>
-                states.map(([name, lat, lng], idx) => {
-                  const p = projection([lng, lat]);
-                  if (!p) return null;
-                  return (
-                    <g
-                      key={`state-${countryName}-${idx}`}
-                      transform={`translate(${p[0]},${p[1]}) scale(${inverseScale})`}
-                    >
-                      <text className="state-label" textAnchor="middle">{name}</text>
-                    </g>
-                  );
-                })
-              )}
+              projectedStateLabels.map((s) => (
+                <g key={s.key} transform={`translate(${s.x},${s.y}) scale(${inverseScale})`}>
+                  <text className="state-label" textAnchor="middle">{s.name}</text>
+                </g>
+              ))}
 
-            {projection &&
-              words.map((w, i) => {
-                const p = projection([w.lng, w.lat]);
-                if (!p) return null;
-                const [x, y] = p;
-                const delay = `${(i % 12) * 0.2}s`;
-                return (
-                  <g key={`${w.ts}-${i}`} transform={`translate(${x},${y}) scale(${inverseScale})`}>
-                    <circle
-                      className="point-ring"
-                      r="3"
-                      stroke={w.color}
-                      style={{ animationDelay: delay }}
-                    />
-                    <circle
-                      className="point-core"
-                      r="2.5"
-                      fill={w.color}
-                      style={{ animationDelay: delay, filter: `drop-shadow(0 0 4px ${w.color})` }}
-                    />
-                    <text className="word-label" x="6" y="-3" style={{ animationDelay: delay }}>
-                      {w.word}
-                    </text>
-                  </g>
-                );
-              })}
+            {projectedWords.map((w) => (
+              <g
+                key={w._key}
+                className="word-point"
+                transform={`translate(${w.x},${w.y}) scale(${inverseScale})`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedWord(w);
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Word: ${w.word}`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setSelectedWord(w);
+                }}
+              >
+                <circle r="10" fill="transparent" />
+                <circle className="point-ring" r="3" stroke={w.color} style={{ animationDelay: w.delay }} />
+                <circle
+                  className="point-core"
+                  r="2.5"
+                  fill={w.color}
+                  style={{ animationDelay: w.delay, filter: `drop-shadow(0 0 4px ${w.color})` }}
+                />
+                <text className="word-label" x="6" y="-3" style={{ animationDelay: w.delay }}>
+                  {w.word}
+                </text>
+              </g>
+            ))}
           </g>
         </svg>
       </div>
@@ -365,7 +453,7 @@ export default function Page() {
         </div>
       </form>
       {error && <div className="toast">{error}</div>}
-      <div className="caption">your point appears near your location · scroll or pinch to zoom</div>
+      <div className="caption">click a point for details · scroll or pinch to zoom</div>
     </div>
   );
 }
