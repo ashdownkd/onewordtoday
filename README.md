@@ -1,84 +1,65 @@
 # One Word Today
 
 A live world map. Type one word describing your day — it appears as a
-blinking point near your location, alongside everyone else's.
+blinking point near your location, alongside everyone else's. Click any
+point to see its word, city, state, country (with flag), and district
+when that detail happens to be available.
 
 ## Stack
 - **Next.js 14** (App Router) — free, deploys natively on Vercel
-- **d3-geo + topojson-client** — real world map geometry (Natural Earth data via `world-atlas`, loaded from a free public CDN)
-- **d3-zoom + d3-selection** — scroll/pinch to zoom, drag to pan
-- **@upstash/redis** — free serverless Redis, connected via the Vercel Marketplace, for storing submissions (persists across all visitors)
-- **ip-api.com** — free IP → lat/lng geolocation, no key needed, called server-side
+- **MapLibre GL JS** — free, open-source (MIT) WebGL map renderer, the
+  community fork of Mapbox GL JS from before Mapbox went proprietary
+- **OpenFreeMap** (`tiles.openfreemap.org/styles/dark`) — free,
+  unlimited, no API key vector tiles built on OpenStreetMap data. This
+  is what actually draws the world: real coastlines, borders, and
+  place names (country/state/city/district, wherever OSM has them) at
+  every zoom level, maintained by the OSM community rather than
+  anything hand-authored in this repo
+- **@upstash/redis** — free serverless Redis, connected via the Vercel
+  Marketplace, for storing submissions (persists across all visitors)
+- **ip-api.com** — free IP → lat/lng/city/region/country geolocation,
+  no key needed, called server-side
 
-## What's new in this pass
-- Map is now zoomable/pannable (scroll wheel, pinch, drag)
-- Each landmass is colored by continent via a radial gradient
-  (`lib/continents.js` for the palette, `lib/countryData.js` for the
-  ISO code → continent lookup) instead of a flat fill
-- Ocean, sea, and continent name labels (`lib/labels.js`)
-- Hovering a country shows its name (native SVG `<title>` tooltip)
-- Fixed a layout bug where the tagline and word count overlapped in
-  the top right on smaller screens
-- Added an intro gate screen (`app/components/Splash.js`) — title,
-  the day's question, "press enter to continue" — before the map loads
-- Added per-IP rate limiting (one submission per 20s, `lib/rateLimit.js`)
-  so the public site can't be spammed
-- Input is sanitized server-side to letters/numbers/apostrophes/hyphens
-  only, so stray characters can't break the layout
-- Added a favicon, Open Graph tags for link previews, a `robots.txt`,
-  and a loading state while the map geometry fetches
-- **Fixed storage:** Vercel KV (`@vercel/kv`) is fully discontinued —
-  switched to `@upstash/redis` via the Vercel Marketplace integration
-  (see step 2 below, this replaces the old "Storage → KV" instructions)
+## Why MapLibre (this was originally a hand-built D3/SVG map)
+The map used to be custom-drawn: SVG country shapes, hand-authored
+label positions, a custom zoom implementation. It looked distinctive
+but had a hard ceiling — every zoom/pan frame meant React re-rendering
+hundreds of SVG elements, which is exactly what caused the mobile lag.
+MapLibre renders via WebGL instead, so panning/zooming is GPU-composited
+and doesn't touch React's render tree at all. It also means real,
+comprehensive place labels (down to district level, in well-mapped
+areas) come from OpenStreetMap directly instead of a curated 17-country
+list I was hand-typing in `lib/stateData.js`.
 
-## Map quality pass
-- Switched from 110m to **50m resolution** map data — real coastline
-  and border detail instead of a simplified silhouette
-- **Country name labels**, not just continents — the ~15 largest
-  nations show even fully zoomed out; more reveal themselves as you
-  zoom in (tune the constants in `page.js`'s `labelThreshold` line
-  if you want labels to appear sooner/later)
-- Labels and point markers now stay a **constant screen size** at any
-  zoom level (each is wrapped in a `scale(1/k)` counter-transform) —
-  before this they'd balloon to unreadable sizes when zoomed in
-- All labels have a dark halo (`paint-order: stroke fill`) so they
-  stay legible over any color of land or sea
-- Continent labels fade out smoothly as you zoom past ~2x, handing
-  off to country labels — same handoff you'd see in a real map app
-- Richer, more saturated continent gradients + a subtle drop-shadow
-  filter on the landmasses for a "lifted off the ocean" depth effect
-- On-screen **zoom controls** (+/−/reset) bottom-right, in addition to
-  scroll/pinch/drag
-- Deepened the zoom range (1x–24x) so there's room to actually explore
-  down to country level
+The old D3/SVG files (`lib/continents.js`, `lib/countryData.js`,
+`lib/labels.js`, `lib/stateData.js`) are no longer imported anywhere —
+left in the repo in case any of that hand-typed data is useful for
+something else later, but safe to delete.
 
-## Redesign pass (monochrome, matching the reference look)
-- Replaced the rainbow per-continent gradients with a **restrained
-  monochrome steel-blue palette** (`lib/continents.js`) — a few subtle
-  variants for texture, not a different color per continent. Color is
-  reserved for the word points, not the base terrain.
-- **Removed the big "AFRICA" / "EUROPE" continent labels** — they were
-  colliding with country names at the default zoom level (the
-  "EUROPE"/country-name overlap bug). Country names alone read much
-  cleaner and match the reference image.
-- Labels switched from bold italic serif to **thin, small, uppercase
-  sans-serif** (`Space Grotesk`) — quieter and more map-like.
-- Softened the graticule grid and land drop-shadow so the base map
-  recedes and the glowing word points are what draws the eye.
+**Attribution requirement:** OpenFreeMap's free tier requires
+attribution, which MapLibre adds automatically (recolored to fit the
+dark theme in `app/globals.css`, bottom-left) — don't remove the
+`AttributionControl` in `app/components/MapView.js`, that's what keeps
+this compliant with their terms.
 
-## Fixing "Couldn't send" after connecting the database
-Connecting a database in Vercel's Storage tab does **not** retroactively
-inject env vars into a deployment that's already running — only new
-deployments pick them up. If you see "Couldn't send" right after
-connecting Upstash: go to **Deployments** → latest deployment → **⋯** →
-**Redeploy**. If it still fails after that, open that deployment's
-**Runtime Logs**, find the failed `/api/words` request, and check the
-actual server error there — `lib/redis.js` already matches Upstash's
-official `Redis.fromEnv()` example for this integration, so a fresh
-redeploy resolves it in the vast majority of cases.
+**Honest caveat on this rewrite:** I can't run a live WebGL map in my
+own environment to test it end-to-end before handing it to you, so
+there's a real chance something needs a follow-up fix once you actually
+open it — the individual pieces (the OpenFreeMap dark style URL, the
+MapLibre marker API, the attribution control) are each verified against
+current docs/examples, but I haven't seen them run together. If
+anything looks broken, send a screenshot and I'll fix it fast.
 
-Nothing here requires a paid plan. Vercel KV and Vercel hosting both have
-generous free tiers that easily cover a small/medium project.
+## Click a word for details
+Every point is a real HTML marker (`maplibregl.Marker`), not a canvas
+shape — that's what lets it reuse plain CSS animation (see
+`.word-marker` in `globals.css`) instead of animating inside WebGL.
+Clicking one opens a card (`app/page.js`) showing whatever location
+detail is actually available for that submission: city, state (from
+ip-api's `regionName`), country with its flag emoji, and district
+**only when ip-api's `district` field happens to be populated** — most
+IPs worldwide only resolve to city-level, so this is often blank and
+the card just omits that row rather than showing something fake.
 
 ## Local setup
 
@@ -87,10 +68,10 @@ npm install
 npm run dev
 ```
 
-Visit http://localhost:3000. Note: without a KV database connected,
-submissions will fail — see step 2 below. Localhost IP also won't
-geolocate (falls back to a default point), so location testing is best
-done after deploying.
+Visit http://localhost:3000. Submitting a word needs the Redis database
+connected (see deploy step 2) — without it, submissions will fail.
+Localhost IP also won't geolocate (falls back to a default point), so
+location testing is best done after deploying.
 
 ## Deploy to Vercel with onewordtoday.live
 
@@ -98,112 +79,61 @@ done after deploying.
 (vercel.com → Add New → Project → import your repo).
 
 **2. Add a free Redis database (via Vercel Marketplace)**
-Vercel KV was discontinued, so this now goes through the Marketplace:
-in your Vercel project → **Storage** tab → **Browse Marketplace** (or
-**Create Database**) → search **"Upstash"** → install **Upstash for
-Redis** (the free tier needs no credit card) → connect it to this
-project. Vercel injects the required environment variables
+Vercel's old native "KV" product was discontinued, so this goes through
+the Marketplace now: in your Vercel project → **Storage** tab →
+**Browse Marketplace** (or **Create Database**) → search **"Upstash"**
+→ install **Upstash for Redis** (free tier, no card needed) → connect
+it to this project. Vercel injects the required environment variables
 automatically — either `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN`
 or `KV_REST_API_URL`/`KV_REST_API_TOKEN` depending on integration
-version; `lib/redis.js` reads either, so no manual copying needed.
+version; `lib/redis.js` reads either, no manual copying needed.
 
 **3. Connect your domain**
-Vercel project → Settings → Domains → add `onewordtoday.live`. Vercel will
-show you the DNS records (usually an A record + CNAME) to add at your
-domain registrar. Propagation is usually minutes to a few hours.
+Vercel project → Settings → Domains → add `onewordtoday.live`. Vercel
+shows the DNS records to add at your registrar. Propagation is usually
+minutes to a few hours.
 
 **4. Redeploy**
-After adding the Redis integration, trigger a redeploy (Vercel does this
-automatically on the next git push, or click Redeploy in the dashboard).
+Vercel does this automatically on the next git push, or click Redeploy
+in the dashboard. **Important:** connecting a database to an *existing*
+deployment doesn't retroactively give it the credentials — only a fresh
+deployment picks those up. If submissions fail right after connecting
+Upstash, this is almost always why: redeploy once more.
 
 That's it — `onewordtoday.live` will be live with real persistence.
-
-## Mobile/tablet fix
-The map previously used a fixed landscape-shaped coordinate box, which
-got letterboxed into a tiny centered strip on tall phone screens. The
-projection now measures its actual container via `ResizeObserver` and
-refits itself — full-bleed on any screen size/orientation, phone,
-tablet, or desktop. Also switched `100vh` to `100dvh` (with a `100vh`
-fallback) since mobile browsers include the address-bar area in `100vh`,
-which was clipping content at the bottom on some devices.
-
-## State/province labels
-Zoom in (or tap +) past a threshold and state/province names appear on
-top of the country layer, for a curated set of major countries covering
-every populated continent (`lib/stateData.js` — 374 entries across 17
-countries, hand-verified). This is **name labels only, not boundary
-outlines** — see below for why, and how to extend it.
-
-**Why not full state/district boundary polygons, or full global
-coverage:** the realistic public sources for this (geoBoundaries /
-Natural Earth admin-1 and admin-2 data) are either stored via Git LFS —
-which breaks silently when fetched through a CDN like jsdelivr, serving
-a tiny pointer file instead of the real shape — or sit behind a
-metadata API that rate-limited during testing. Shipping a data
-dependency I can't verify works is exactly what caused the earlier
-storage bug, so this was left out rather than risk repeating that.
-District/county-level data globally is also just very large (tens of
-thousands of polygons) — not a good fit for a decorative background map
-loaded client-side.
-
-**To extend country coverage:** add another entry to `STATE_INFO` in
-`lib/stateData.js`, same shape: `CountryName: [[name, lat, lng], ...]`.
-**To eventually add real boundary outlines:** the more robust path is a
-server-side proxy — a Next.js API route that fetches and caches
-geoBoundaries data on your own infrastructure (sidesteps both the LFS
-and rate-limit issues) — rather than the client fetching a third party
-directly. Happy to help build that out if/when you want to invest in it.
-
-## Label readability + zoom smoothness
-- Country/state/sea labels were rendering too small to read — bumped
-  font sizes up meaningfully and strengthened the dark halo behind
-  each one (`app/globals.css`).
-- Found the actual cause of choppy zoom: every zoom/pan frame was
-  re-running the full map projection for all ~250 country shapes and
-  every label, because that work was happening inline during render.
-  All of it is now precomputed in `useMemo` blocks tied to the map
-  data and container size — a zoom/pan gesture now only updates one
-  CSS transform, which is what the browser is actually fast at.
-  Added `will-change: transform` on that layer too.
-
-## Click a word for details
-Every point on the map is now clickable (bigger invisible hit-area
-than the visible dot, so it's easy to tap on mobile). It opens a card
-showing the word, and whatever location detail is actually available
-for that submission: city, state (now pulled from the same IP lookup
-via ip-api's `regionName` field), country with its flag, and district
-**when ip-api's `district` field happens to be populated** — most IPs
-worldwide only resolve to city-level, so this will often be blank, and
-the card simply omits that row rather than showing something fake.
 
 ## How it works, short version
 
 - User types a word → POSTs to `/api/words`
-- Server reads their IP from request headers → looks up approximate
-  lat/lng via ip-api.com → picks a color via a simple keyword mood
-  lookup (`lib/mood.js`) → stores `{word, lat, lng, color, timestamp}`
-  in a Redis list via `lib/redis.js`
-- Frontend polls `/api/words` every 5 seconds, re-renders all points
-  whose timestamp is within the last 24 hours (older ones are filtered
-  out both server- and client-side)
-- The world map itself is real country geometry — not a drawing —
-  projected with `d3-geo`'s Natural Earth projection
+- Server reads their IP from request headers → looks up lat/lng, city,
+  region, country, and (sometimes) district via ip-api.com → picks a
+  color via a simple keyword mood lookup (`lib/mood.js`) → stores it
+  all as one entry in a Redis list via `lib/redis.js`
+- Frontend polls `/api/words` every 5 seconds; `MapView.js` diffs the
+  word list against the current markers on the map
+- The map itself (terrain, borders, all labels) is OpenFreeMap's vector
+  tiles rendered by MapLibre — nothing about the base map is generated
+  by this app's code
 
 ## Swapping in real GPS location later
 
 Right now every submission is geolocated by IP (fast, no permission
-prompt, good enough for city-level accuracy). If you want to ask users
-for precise GPS location instead:
-
-1. In `app/page.js`, before POSTing, call
-   `navigator.geolocation.getCurrentPosition()` and send `lat`/`lng` in
-   the request body.
-2. In `app/api/words/route.js`, use the client-sent `lat`/`lng` instead
-   of calling `ipToLocation()` when present.
+prompt, good enough for city-level accuracy). To ask for precise GPS
+instead: in `app/page.js`, call `navigator.geolocation.getCurrentPosition()`
+before POSTing and send `lat`/`lng` in the request body; in
+`app/api/words/route.js`, use the client-sent `lat`/`lng` instead of
+calling `ipToLocation()` when present.
 
 ## Known limits (free tier)
 - `ip-api.com` free tier: 45 requests/minute — plenty for a small/medium
   site, would need a paid key only at high scale
-- Upstash Redis free tier: 500K commands/month — fine for this use case
-  since old words are trimmed automatically and each submission is only
-  a few commands
+- Upstash Redis free tier: 500K commands/month — fine here since old
+  words are trimmed automatically and each submission is only a few
+  commands
+- OpenFreeMap's public instance has no hard usage limit, but it's a
+  donation-funded project — if this ever gets Hacker-News-front-page
+  levels of traffic, consider sponsoring them or self-hosting via their
+  Protomaps-style setup (see their GitHub)
+- Rate limiting: one submission per IP per 20 seconds (`lib/rateLimit.js`)
+- Input is sanitized server-side to letters/numbers/apostrophes/hyphens
+  only, one word max 24 characters

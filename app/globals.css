@@ -14,18 +14,7 @@ html, body {
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  background:
-    radial-gradient(circle at 50% 35%, rgba(90, 130, 160, 0.07), transparent 62%),
-    #080B10;
-}
-
-.canvas::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 5;
+  background: #080B10;
 }
 
 /* ---------- Header ---------- */
@@ -37,7 +26,9 @@ header.owt-header {
   align-items: flex-start;
   padding: 28px 40px;
   z-index: 20;
+  pointer-events: none;
 }
+header.owt-header * { pointer-events: auto; }
 
 .logo {
   font-family: "Fraunces", serif;
@@ -76,102 +67,95 @@ header.owt-header {
 }
 .count-badge b { color: #E8DCC8; font-family: "Fraunces", serif; font-size: 15px; }
 
-/* ---------- Map ---------- */
-.map-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; }
-svg#map { width: 100%; height: 100%; cursor: grab; touch-action: none; }
-svg#map:active { cursor: grabbing; }
-.map-layer { will-change: transform; }
+/* ---------- Map (MapLibre GL — WebGL, replaces the old SVG map) ---------- */
+.map-wrap { position: absolute; inset: 0; z-index: 10; }
+.maplibre-map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
 .map-loading {
   position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   font-family: "Fraunces", serif;
   font-style: italic;
   font-size: 14px;
   color: #5C6577;
+  text-align: center;
+  max-width: 260px;
   animation: owt-pulse 2s ease-in-out infinite;
   z-index: 15;
-}
-
-.land { transition: filter 0.2s ease; }
-.land:hover { filter: brightness(1.3); }
-.graticule { stroke: rgba(120, 150, 180, 0.05); stroke-width: 0.4; fill: none; }
-
-/* Halo technique: a dark stroke behind the fill makes every label
-   legible regardless of what color of land or sea sits behind it,
-   without needing per-label background boxes. */
-.sea-label,
-.country-label,
-.word-label {
-  paint-order: stroke fill;
-  stroke: #080B10;
-  stroke-linejoin: round;
-}
-
-.sea-label {
-  font-family: "Space Grotesk", sans-serif;
-  font-weight: 400;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  fill: rgba(160, 195, 220, 0.55);
-  stroke-width: 2.5px;
   pointer-events: none;
-  user-select: none;
 }
 
-.country-label {
-  font-family: "Space Grotesk", sans-serif;
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  fill: rgba(240, 244, 248, 0.92);
-  stroke-width: 3px;
-  pointer-events: none;
-  user-select: none;
+/* Recolor MapLibre's required attribution control to fit the dark
+   theme — text/links stay visible and functional, just restyled. */
+.maplibregl-ctrl-attrib {
+  background: rgba(8, 11, 16, 0.55) !important;
+  color: #8B95A3 !important;
+  font-size: 10px !important;
+}
+.maplibregl-ctrl-attrib a { color: #B7C0CC !important; }
+.maplibregl-ctrl-bottom-left { z-index: 20; }
+
+/* ---------- Word point markers (real DOM elements via maplibregl.Marker,
+   not SVG — lets these reuse plain CSS animation while the map itself
+   is WebGL-rendered underneath) ---------- */
+.word-marker {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  cursor: pointer;
 }
 
-.state-label {
-  font-family: "Space Grotesk", sans-serif;
-  font-weight: 500;
-  font-size: 9.5px;
-  letter-spacing: 0.05em;
-  fill: rgba(225, 232, 238, 0.88);
-  stroke: #080B10;
-  stroke-width: 2.2px;
-  paint-order: stroke fill;
-  stroke-linejoin: round;
-  pointer-events: none;
-  user-select: none;
+.word-marker-core {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 5px; height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--mood-color);
+  box-shadow: 0 0 6px var(--mood-color);
+  animation: owt-blink-dom 2.6s ease-in-out infinite;
 }
 
-.point-core { animation: owt-blink 2.6s ease-in-out infinite; }
-.point-ring { fill: none; animation: owt-ripple 2.6s ease-out infinite; transform-origin: center; }
-.word-point { cursor: pointer; }
-.word-point:hover .point-core { animation-play-state: paused; opacity: 1; r: 3.6; }
-.word-point:focus-visible { outline: none; }
-.word-point:focus-visible .point-ring { stroke-width: 1.6; opacity: 0.9; }
-
-@keyframes owt-blink {
-  0%, 100% { opacity: 0.35; r: 2.2; }
-  50% { opacity: 1; r: 3.4; }
-}
-@keyframes owt-ripple {
-  0% { r: 3; opacity: 0.55; stroke-width: 1.2; }
-  100% { r: 15; opacity: 0; stroke-width: 0.2; }
+.word-marker-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  border: 1px solid var(--mood-color);
+  animation: owt-ripple-dom 2.6s ease-out infinite;
 }
 
-.word-label {
+.word-marker-label {
+  position: absolute;
+  left: 10px; top: -9px;
   font-family: "Fraunces", serif;
   font-style: italic;
-  font-size: 9px;
-  fill: #E8DCC8;
-  stroke-width: 2px;
+  font-size: 12px;
+  color: #E8DCC8;
+  white-space: nowrap;
   opacity: 0;
-  animation: owt-label-fade 2.6s ease-in-out infinite;
+  text-shadow: 0 0 3px #080B10, 0 0 5px #080B10, 0 0 8px #080B10;
   pointer-events: none;
+  animation: owt-label-fade-dom 2.6s ease-in-out infinite;
 }
-@keyframes owt-label-fade {
+
+.word-marker:hover .word-marker-core {
+  animation-play-state: paused;
+  opacity: 1;
+  transform: scale(1.3);
+}
+
+@keyframes owt-blink-dom {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@keyframes owt-ripple-dom {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0; transform: scale(4.5); }
+}
+@keyframes owt-label-fade-dom {
   0%, 20% { opacity: 0; }
   45%, 75% { opacity: 0.95; }
   100% { opacity: 0; }
@@ -212,12 +196,14 @@ svg#map:active { cursor: grabbing; }
 .caption {
   position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
   font-size: 10.5px; letter-spacing: 0.08em; color: #3E4553; z-index: 20;
+  pointer-events: none;
 }
 
 .legend {
   position: absolute; bottom: 110px; left: 40px;
   font-size: 10px; color: #5C6577; z-index: 20;
   display: flex; flex-direction: column; gap: 6px;
+  pointer-events: none;
 }
 .legend-item { display: flex; align-items: center; gap: 8px; }
 .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
@@ -249,6 +235,7 @@ svg#map:active { cursor: grabbing; }
 .toast {
   position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
   font-size: 11px; color: #E8877C; z-index: 20;
+  pointer-events: none;
 }
 
 .info-card {
@@ -374,7 +361,7 @@ svg#map:active { cursor: grabbing; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .point-core, .point-ring, .word-label, .splash-hint { animation: none; opacity: 0.85; }
+  .word-marker-core, .word-marker-ring, .word-marker-label, .splash-hint { animation: none; opacity: 0.85; }
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {
