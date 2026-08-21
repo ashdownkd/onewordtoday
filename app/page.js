@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Splash from "./components/Splash";
-import MapView, { INITIAL_CENTER, INITIAL_ZOOM } from "./components/MapView";
+import MapErrorBoundary from "./components/MapErrorBoundary";
+import { INITIAL_CENTER, INITIAL_ZOOM } from "@/lib/mapConfig";
 import { flagEmoji } from "@/lib/flag";
+
+// maplibre-gl touches window/document at import time, which crashes
+// during Next's server-side render of "use client" components. Loading
+// it only on the client (ssr: false) is what fixes that.
+const MapView = dynamic(() => import("./components/MapView"), {
+  ssr: false,
+  loading: () => null,
+});
 
 function timeAgo(ts) {
   const diffMin = Math.floor((Date.now() - ts) / 60000);
@@ -177,7 +187,9 @@ export default function Page() {
             your browser doesn&rsquo;t support WebGL, so the map can&rsquo;t render here.
           </div>
         )}
-        <MapView words={words} onSelectWord={setSelectedWord} onReady={handleMapReady} />
+        <MapErrorBoundary>
+          <MapView words={words} onSelectWord={setSelectedWord} onReady={handleMapReady} />
+        </MapErrorBoundary>
       </div>
 
       <form className="input-dock" onSubmit={submitWord}>

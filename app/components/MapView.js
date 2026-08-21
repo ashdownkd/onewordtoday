@@ -2,14 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
+import { INITIAL_CENTER, INITIAL_ZOOM } from "@/lib/mapConfig";
 
 // OpenFreeMap: free, unlimited, no API key, MIT-licensed vector tiles
 // built on OpenStreetMap data. "dark" is one of their built-in styles.
 // Attribution is required by their terms — kept via AttributionControl
 // below, just repositioned/compacted rather than removed.
-export const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
-export const INITIAL_CENTER = [12, 22];
-export const INITIAL_ZOOM = 1.6;
+const STYLE_URL = "https://tiles.openfreemap.org/styles/dark";
 
 export default function MapView({ words, onSelectWord, onReady }) {
   const containerRef = useRef(null);
@@ -18,33 +17,50 @@ export default function MapView({ words, onSelectWord, onReady }) {
   const onSelectWordRef = useRef(onSelectWord);
   onSelectWordRef.current = onSelectWord;
 
-  // Create the map once.
+  // Create the map once. Wrapped defensively — if anything here
+  // throws (bad tile response, unexpected API shape, no WebGL), it's
+  // reported through onReady instead of crashing the whole page.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    if (!maplibregl.supported()) {
-      onReady?.(null, "unsupported");
+    try {
+      let supported = true;
+      try {
+        supported = typeof maplibregl.supported === "function" ? maplibregl.supported() : true;
+      } catch {
+        supported = true; // don't let feature-detection itself fail the app
+      }
+      if (!supported) {
+        onReady?.(null, "unsupported");
+        return;
+      }
+
+      const map = new maplibregl.Map({
+        container: containerRef.current,
+        style: STYLE_URL,
+        center: INITIAL_CENTER,
+        zoom: INITIAL_ZOOM,
+        minZoom: 1.2,
+        maxZoom: 18,
+        attributionControl: false,
+      });
+
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
+
+      map.on("load", () => onReady?.(map, "ready"));
+      map.on("error", (e) => {
+        console.error("MapLibre error:", e?.error || e);
+      });
+
+      mapRef.current = map;
+    } catch (err) {
+      console.error("Failed to initialize map:", err);
+      onReady?.(null, "error");
       return;
     }
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: STYLE_URL,
-      center: INITIAL_CENTER,
-      zoom: INITIAL_ZOOM,
-      minZoom: 1.2,
-      maxZoom: 18,
-      attributionControl: false,
-    });
-
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
-
-    map.on("load", () => onReady?.(map, "ready"));
-
-    mapRef.current = map;
-
     function handleResize() {
-      map.resize();
+      mapRef.current?.resize();
     }
     window.addEventListener("resize", handleResize);
 
@@ -52,7 +68,7 @@ export default function MapView({ words, onSelectWord, onReady }) {
       window.removeEventListener("resize", handleResize);
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
-      map.remove();
+      mapRef.current?.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,11 +111,14 @@ export default function MapView({ words, onSelectWord, onReady }) {
         onSelectWordRef.current?.(w);
       });
 
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-        .setLngLat([w.lng, w.lat])
-        .addTo(map);
-
-      markersRef.current.push(marker);
+      try {
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat([w.lng, w.lat])
+          .addTo(map);
+        markersRef.current.push(marker);
+      } catch (err) {
+        console.error("Failed to place marker:", err);
+      }
     });
   }, [words]);
 
